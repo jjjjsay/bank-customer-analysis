@@ -31,3 +31,40 @@ Customer acquisition in retail banking is expensive, and churn directly erodes l
 A secondary, real-world complication tackled in this project: the bank's actual source data arrives as **two separate, messy Excel extracts** (customer records and account records) that must be cleaned, standardized, and merged before any of the above can be answered — mirroring the kind of raw data an analyst receives in practice, rather than a pre-cleaned CSV.
 
 ---
+
+## Methodology
+
+### 1. Data Cleaning & Integration (`src/01_data_cleaning.py`)
+- Loaded two raw sheets (`Customer_Info`, `Account_Info`) from `Bank_Churn_Messy.xlsx`
+- Fixed data quality issues found during profiling:
+  - Currency-formatted strings (e.g. `€101348.88`) parsed to numeric
+  - A `-€999999` sentinel value used for missing `EstimatedSalary` entries, converted to `NaN` and median-imputed
+  - Inconsistent country labels (`France` / `French` / `FRA`) standardized to one canonical value per country
+  - `Yes`/`No` text fields converted to boolean 0/1
+  - Exact duplicate rows removed from both sheets
+  - A handful of missing `Age` and `Surname` values imputed/flagged
+- Merged both sheets into one customer-level table on `CustomerId`
+- **Validated** the cleaned output against the bank's reference clean export (`Bank_Churn.csv`) — achieved a **100% match rate** across all numeric fields for all 10,000 customers, confirming the cleaning logic is correct
+
+### 2. Exploratory Data Analysis (`src/02_eda.py`)
+- Profiled customer demographics (age, geography, gender, salary distributions)
+- Compared churners vs. non-churners across every numeric and categorical attribute
+
+### 3. Geographic Deep-Dive (`src/03_geography_analysis.py`)
+- Compared account balance, credit score, product holdings, and activity rates across the three countries
+- Ran one-way ANOVA tests on continuous variables and a chi-square test of independence between geography and churn to confirm differences are statistically significant, not noise
+
+### 4. Customer Segmentation (`src/04_customer_segmentation.py`)
+- Standardized 7 behavioral/financial features and applied **K-Means clustering**
+- Used the elbow method and silhouette score to sanity-check cluster count, then selected **k=4** for business interpretability
+- Profiled each segment's demographics, financial behavior, and churn rate
+- Visualized segments via PCA projection
+
+### 5. Predictive Modeling (`src/05_churn_prediction.py`)
+- Engineered features: balance-to-salary ratio, zero-balance flag, Germany flag, tenure-to-age ratio
+- One-hot encoded categorical variables; stratified 80/20 train/test split
+- Trained and compared three models: **Logistic Regression** (interpretable baseline), **Random Forest**, and **XGBoost**
+- Evaluated with accuracy, precision, recall, F1, and ROC-AUC (ROC-AUC and recall on the minority "churned" class matter most for a retention use case, since missing a churner is costlier than a false alarm)
+- Extracted feature importances from the winning model
+
+---
