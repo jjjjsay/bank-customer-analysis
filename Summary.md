@@ -68,3 +68,82 @@ A secondary, real-world complication tackled in this project: the bank's actual 
 - Extracted feature importances from the winning model
 
 ---
+
+## Skills Demonstrated
+
+- **Data wrangling**: multi-sheet Excel ingestion, currency/text parsing, sentinel-value handling, deduplication, data validation against a ground-truth source
+- **Statistical inference**: ANOVA, chi-square tests of independence
+- **Exploratory data analysis & data visualization**: `pandas`, `matplotlib`, `seaborn`
+- **Unsupervised learning**: feature scaling, K-Means clustering, elbow/silhouette model selection, PCA for visualization
+- **Supervised machine learning**: classification model comparison (Logistic Regression, Random Forest, XGBoost), class imbalance handling, feature engineering, feature importance interpretation
+- **Business communication**: translating model output and statistical results into segment-specific, actionable retention recommendations
+
+---
+
+## Results
+
+### Demographics
+The customer base skews slightly male (54.6%), averages ~39 years old, and is split roughly 50/25/25 across France/Germany/Spain (France holds twice the customer count of Germany or Spain individually).
+
+### Churn Drivers (Churners vs. Non-Churners)
+
+| Attribute | Stayed | Churned | Difference |
+|---|---|---|---|
+| Age | 37.4 | 44.8 | **+19.9%** |
+| Balance | $72,745 | $91,109 | **+25.2%** |
+| Credit Score | 651.9 | 645.4 | -1.0% |
+| Tenure | 5.03 yrs | 4.93 yrs | -2.0% |
+
+Categorical churn rates: **Inactive members (26.9%) churn nearly 2x active members (14.3%)**; **Female customers (25.1%) churn more than male customers (16.5%)**; customers with **3-4 products churn dramatically more** than those with 1-2 (a strong red flag for over-cross-sold accounts).
+
+### Geographic Differences (statistically significant, p < 0.001)
+- **Germany**: 32.4% churn rate (vs. ~16% for France/Spain), and *every* German customer maintains a non-zero balance — German customers carry meaningfully higher balances on average, making their departure more costly per customer.
+- **France & Spain**: near-identical behavior on churn, balance, and product mix — France and Spain can likely share a retention playbook, while Germany needs its own strategy.
+
+### Customer Segments
+
+| Segment | Size | Profile | Churn Rate |
+|---|---|---|---|
+| **0 — Active Affluent Loyalists** | 28.7% | Young (35), high balance (~$108k), fully active, single product | **13%** (lowest risk) |
+| **1 — Multi-Product Value Customers** | 27.6% | Low balance (~$9.6k), highest product count (2.1), moderate activity | **12%** (lowest risk) |
+| **2 — Disengaged At-Risk** | 32.5% | High balance (~$106k), **0% active membership**, single product | **29%** (high risk) |
+| **3 — Senior High-Value** | 11.2% | Oldest group (60 yrs), active (83%), moderate balance | **36%** (highest risk) |
+
+Segment 2 is the single largest group (32.5% of the base) and combines high account value with zero engagement — the clearest reactivation target. Segment 3, while smaller, churns at the highest rate despite being active, suggesting age-related life-stage churn (retirement, relocation, competitor offers) rather than a satisfaction problem.
+
+### Predictive Model Performance
+
+| Model | Accuracy | Precision | Recall | F1 | ROC-AUC |
+|---|---|---|---|---|---|
+| Logistic Regression | 71.2% | 38.6% | 70.8% | 50.0% | 77.5% |
+| Random Forest | 82.8% | 56.1% | 70.0% | 62.3% | 86.1% |
+| **XGBoost (best)** | 80.9% | 52.1% | **73.5%** | 61.0% | **86.5%** |
+
+**Top predictive features (XGBoost):** Number of Products, Zero-Balance Flag, Age, Has Credit Card, Germany Flag — confirming the patterns found in EDA and the geographic analysis.
+
+XGBoost was selected as the production candidate because it achieves the best ROC-AUC and the highest recall on churners — for a retention use case, catching more true churners (even at some cost to precision) is the right trade-off, since a missed churner is a lost customer while a false alarm just costs a discount offer.
+
+---
+
+## Business Recommendations
+
+1. **Launch a Germany-specific retention program.** Germany churns at 2x the rate of France/Spain despite carrying the bank's highest average balances — this is the single highest-value, highest-urgency segment to address. Investigate local competitive pressure and pricing.
+2. **Build an inactivity early-warning trigger.** Since inactive members churn at nearly 2x the rate of active ones, flag any customer who goes inactive for 60-90 days and route them into a re-engagement campaign (personal outreach, fee waivers, product bundling) before they churn.
+3. **Re-examine multi-product cross-sell practices.** Customers holding 3-4 products churn at a much higher rate than those with 1-2 — this points to over-selling or bundling that isn't landing well, rather than "more products = more loyalty."
+4. **Prioritize Segment 2 ("Disengaged At-Risk") for win-back campaigns.** This is the largest segment (32.5% of customers) and combines high balances with zero activity — the highest expected-value reactivation target.
+5. **Design an age-aware retention track for Segment 3 ("Senior High-Value").** Their churn appears life-stage driven rather than a satisfaction issue; consider retirement-planning products, loyalty perks, or dedicated relationship managers rather than generic discounts.
+6. **Operationalize the XGBoost model as a monthly churn-risk score.** Score the full active customer base monthly and route the top-risk decile to the retention team — at 73.5% recall, the model would catch roughly 3 in 4 customers who are about to churn.
+7. **Fix the data pipeline at the source.** The messy raw export contained a fake `-999999` missing-value sentinel and three spellings of "France" — these should be fixed upstream in the source system, not patched downstream in every analysis.
+
+---
+
+## Next Steps
+
+- **Cost-sensitive threshold tuning**: work with the retention team to estimate the cost of a false positive (unnecessary retention offer) vs. false negative (lost customer) and tune the model's decision threshold accordingly, rather than using the default 0.5 cutoff.
+- **A/B test retention interventions**: run controlled experiments on the top-risk decile (e.g., proactive call vs. email offer vs. control) to measure actual causal impact on retention, since correlation-based recommendations above are hypotheses, not proven interventions.
+- **Add tenure-stage and transaction-level data**: this dataset only has a snapshot; monthly transaction trends, complaint/support-ticket history, and product usage over time would likely sharpen both the segmentation and the model considerably.
+- **Model monitoring**: set up a simple monthly re-training and performance-drift check, since customer behavior and market conditions (interest rates, competitor offers) will shift the churn drivers over time.
+- **Explainability layer**: add SHAP values on top of the XGBoost model so retention agents can see *why* a specific customer was flagged, not just that they were.
+- **Survival analysis**: model *time-to-churn* (e.g. Cox proportional hazards) rather than a binary snapshot, to estimate not just who will churn but roughly when — useful for timing interventions.
+
+---
